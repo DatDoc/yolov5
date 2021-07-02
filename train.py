@@ -394,7 +394,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                             dataloader=testloader,
                                             save_dir=save_dir,
                                             save_json=is_coco and final_epoch,
-                                            verbose=nc < 50 and final_epoch,
+                                            verbose=True,
+                                            save_json=True,
                                             plots=plots and final_epoch,
                                             wandb_logger=wandb_logger,
                                             compute_loss=compute_loss)
@@ -404,10 +405,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 f.write(s + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
 
             # Log
+            # tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss',  # train loss
+            #         'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
+            #         'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
+            #         'x/lr0', 'x/lr1', 'x/lr2']  # params
             tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss',  # train loss
-                    'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
+                    'metrics/precision', 'metrics/recall', 'metrics/mAP_0.4', 'metrics/mAP_0.4:0.95',
                     'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
-                    'x/lr0', 'x/lr1', 'x/lr2']  # params
+                    'x/lr0', 'x/lr1', 'x/lr2']  # params # CHANGE
             for x, tag in zip(list(mloss[:-1]) + list(results) + lr, tags):
                 if loggers['tb']:
                     loggers['tb'].add_scalar(tag, x, epoch)  # TensorBoard
@@ -416,6 +421,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
             # Update best mAP
             fi = fitness(np.array(results).reshape(1, -1))  # weighted combination of [P, R, mAP@.5, mAP@.5-.95]
+            print("[INFO] fi: {} | best_fitness: {}".format(fi, best_fitness))
             if fi > best_fitness:
                 best_fitness = fi
             wandb_logger.end_epoch(best_result=best_fitness == fi)
