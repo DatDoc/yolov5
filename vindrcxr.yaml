@@ -1,0 +1,8 @@
+train: C:\Users\Dat\Desktop\ML\medical-project\datasets\VinDr-CXR\test_yolov5_on_local\_train
+val: C:\Users\Dat\Desktop\ML\medical-project\datasets\VinDr-CXR\test_yolov5_on_local\_valid
+
+nc: 14
+names: ["Aortic enlargement", "Atelectasis", "Calcification","Cardiomegaly",
+        "Consolidation","ILD", "Infiltration","Lung Opacity","Nodule/Mass",
+        "Other lesion","Pleural effusion","Pleural thickening","Pneumothorax",
+        "Pulmonary fibrosis"]

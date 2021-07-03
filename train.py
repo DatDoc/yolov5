@@ -393,9 +393,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                             single_cls=single_cls,
                                             dataloader=testloader,
                                             save_dir=save_dir,
-                                            save_json=is_coco and final_epoch,
                                             verbose=True,
                                             save_json=True,
+                                            anno_json=opt.anno_json,
                                             plots=plots and final_epoch,
                                             wandb_logger=wandb_logger,
                                             compute_loss=compute_loss)
@@ -522,6 +522,7 @@ def parse_opt(known=False):
     parser.add_argument('--save_period', type=int, default=-1, help='Log model after every "save_period" epoch')
     parser.add_argument('--artifact_alias', type=str, default="latest", help='version of dataset artifact to be used')
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
+    parser.add_argument('--anno_json', type=str, default=None, help='add validation json to use pycocotools')
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 

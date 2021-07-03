@@ -194,7 +194,7 @@ def run(data,
                                   'category_id': coco91class[int(p[5])] if is_coco else int(p[5]) + 1,
                                   'bbox': [round(x, 3) for x in b],
                                   'score': round(p[4], 5)})
-
+                
             # Assign all predictions as incorrect
             correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
             if nl:
@@ -282,7 +282,7 @@ def run(data,
         # anno_json = str(Path(data.get('path', '../coco')) / 'annotations/instances_val2017.json')  # annotations json
         if anno_json is None:
             raise Exception('annotation json is missing !!!')
-
+        
         pred_json = str(save_dir / f"{w}_predictions.json")  # predictions json
         print('\nEvaluating pycocotools mAP... saving %s...' % pred_json)
         with open(pred_json, 'w') as f:
