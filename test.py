@@ -10,11 +10,14 @@ import os
 import sys
 from pathlib import Path
 from threading import Thread
+import itertools
 
 import numpy as np
 import torch
 import yaml
 from tqdm import tqdm
+from terminaltables import AsciiTable
+
 
 FILE = Path(__file__).absolute()
 sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
@@ -187,6 +190,12 @@ def run(data,
             if save_json:
                 # [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...
                 image_id = int(path.stem) if path.stem.isnumeric() else path.stem
+                with open(anno_json) as json_file:
+                    data = json.load(json_file)
+                    for p in data['images']:
+                        if p["file_name"].split(".")[0] == image_id:
+                            image_id = p["id"]
+                            break
                 box = xyxy2xywh(predn[:, :4])  # xywh
                 box[:, :2] -= box[:, 2:] / 2  # xy center to top-left corner
                 for p, b in zip(pred.tolist(), box.tolist()):
@@ -292,18 +301,62 @@ def run(data,
             check_requirements(['pycocotools'])
             from pycocotools.coco import COCO
             from pycocotools.cocoeval import COCOeval
+    
+            imgIds = [x for x in range(len(dataloader.dataset.img_files))]
+            
+            cocoGt = COCO(anno_json)  # initialize COCO ground truth api
+            # cat_ids = cocoGt.get_cat_ids(cat_names=CLASSES)
+            
+            cocoDt = cocoGt.loadRes(pred_json)  # initialize COCO pred api
+            cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
+            cocoEval.params.imgIds = imgIds  # image IDs to evaluate
+            cocoEval.params.iouThrs = np.array([0.4]) # iou 0.4
+            # cocoEval.params.catIds = cat_ids
+            cocoEval.evaluate()
+            cocoEval.accumulate()
+            cocoEval.summarize()
 
-            anno = COCO(anno_json)  # init annotations api
-            pred = anno.loadRes(pred_json)  # init predictions api
-            eval = COCOeval(anno, pred, 'bbox')
-            if is_coco:
-                eval.params.imgIds = [int(Path(x).stem) for x in dataloader.dataset.img_files]  # image IDs to evaluate
-                eval.params.iouThrs = np.array([0.4]) # CHANGE
-            eval.evaluate()
-            eval.accumulate()
-            eval.summarize()
+            # Compute per-category AP
+            # from https://github.com/facebookresearch/detectron2/
+            # cat_ids = cocoGt.get_cat_ids(cat_names=self.CLASSES)
+            precisions = cocoEval.eval['precision']
+            
+            # precision: (iou, recall, cls, area range, max dets)
+            assert len(cocoEval.params.catIds) == precisions.shape[2]
+
+            results_per_category = []
+            for idx, catId in enumerate(cocoEval.params.catIds):
+                # area range index 0: all area ranges
+                # max dets index -1: typically 100 per image
+    
+                nm = cocoGt.loadCats(int(catId))[0]
+                precision = precisions[:, :, idx, 0, -1]
+                precision = precision[precision > -1]
+                if precision.size:
+                    ap = np.mean(precision)
+                else:
+                    ap = float('nan')
+                results_per_category.append(
+                    (f'{nm["name"]}', f'{float(ap):0.3f}'))
+
+            num_columns = min(6, len(results_per_category) * 2)
+            results_flatten = list(
+                itertools.chain(*results_per_category))
+            headers = ['category', 'AP'] * (num_columns // 2)
+            results_2d = itertools.zip_longest(*[
+                results_flatten[i::num_columns]
+                for i in range(num_columns)
+            ])
+            table_data = [headers]
+            table_data += [result for result in results_2d]
+            table = AsciiTable(table_data)
+            print('\n' + table.table)
+
             # map, map50 = eval.stats[:2]  # update results (mAP@0.5:0.95, mAP@0.5)
-            map, map40 = eval.stats[:2]  # update results (mAP@0.4:0.95, mAP@0.4) # CHANGE
+            if save_json:
+                map, map40 = cocoEval.stats[0], cocoEval.stats[0]  # update results (mAP@0.4:0.95, mAP@0.4) # CHANGE
+            else:
+                map, map40 = cocoEval.stats[:2]
         except Exception as e:
             print(f'pycocotools unable to run: {e}')
 
@@ -314,7 +367,10 @@ def run(data,
         print(f"Results saved to {save_dir}{s}")
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
-        maps[c] = ap[i]
+        if save_json:
+            maps[c] = float(results_per_category[i][1])
+        else:
+            maps[c] = ap[i]
     # return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
     return (mp, mr, map40, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t # CHANGE
 
