@@ -191,7 +191,7 @@ def run(data,
                 # [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...
                 image_id = int(path.stem) if path.stem.isnumeric() else path.stem
                 with open(anno_json) as json_file:
-                    data = json.load(anno_json)
+                    data = json.load(json_file)
                     for p in data['images']:
                         if p["file_name"].split(".")[0] == image_id:
                             image_id = p["id"]
